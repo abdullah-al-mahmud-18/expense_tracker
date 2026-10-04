@@ -51,35 +51,12 @@ class ExpenseRepository {
   Future<void> addExpense(String type, double amount) async {
     final db = await _dbHelper.database;
     final current = await getCurrentPeriod();
-
-    final existing = await db.query(
-      'expenses',
-      where: 'period_id = ? AND type = ?',
-      whereArgs: [current.id, type],
-      limit: 1,
-    );
-
-    if (existing.isEmpty) {
-      await db.insert('expenses', {
-        'period_id': current.id,
-        'type': type,
-        'amount': amount,
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-      });
-      return;
-    }
-
-    final row = existing.first;
-    final updatedAmount = (row['amount'] as num).toDouble() + amount;
-    await db.update(
-      'expenses',
-      {
-        'amount': updatedAmount,
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'id = ?',
-      whereArgs: [row['id']],
-    );
+    await db.insert('expenses', {
+      'period_id': current.id,
+      'type': type,
+      'amount': amount,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
   Future<void> closeCurrentPeriod() async {

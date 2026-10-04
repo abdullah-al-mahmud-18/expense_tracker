@@ -10,9 +10,11 @@ rather than writing the implementation by hand.
 
 - Log an expense with a short text command in the form
   `<expense_type> <amount>`, e.g. `fare 60`.
-- Submitting the same type again within the same period adds onto the
-  existing entry instead of creating a duplicate (`fare 60` then
-  `fare 100` becomes one `fare` entry of `160`).
+- Uppercase letters are converted to lowercase as you type (`Fare 60`
+  is entered as `fare 60`).
+- Every submission is saved as its own entry, even for a type already
+  used in the period (`fare 100` then `fare 20` stays as two separate
+  `fare` entries).
 - Amounts can be negative, to record adjustments/corrections against an
   existing type (e.g. `fare -10`).
 
@@ -25,9 +27,12 @@ rather than writing the implementation by hand.
 
 ### History page
 
-- Shows the live current period (with its running total) and every
-  previous period, each collapsible and showing its date range, expense
-  count, and total.
+- Filter expenses by date range with the **From** and **To** date
+  pickers, then tap **Apply**. Defaults to the last 30 days (today minus
+  30 days through today); both end dates are included.
+- Shows every expense in the selected range as its own entry, newest
+  first, across current and previous periods, along with the total
+  spent in that range.
 - **Clear History**: deletes the *n* oldest previous periods (and their
   expenses) at once, after confirming how many to remove.
 

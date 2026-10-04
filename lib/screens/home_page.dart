@@ -207,6 +207,7 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: TextField(
                           controller: _controller,
+                          inputFormatters: [_LowerCaseTextFormatter()],
                           decoration: const InputDecoration(
                             hintText: 'e.g. fare 60',
                             border: OutlineInputBorder(),
@@ -233,5 +234,16 @@ class _HomePageState extends State<HomePage> {
         },
       ),
     );
+  }
+}
+
+/// Converts any typed or pasted uppercase letters to lowercase.
+class _LowerCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(text: newValue.text.toLowerCase());
   }
 }

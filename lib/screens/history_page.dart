@@ -1,13 +1,83 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/expense.dart';
 import '../providers/expense_provider.dart';
 import '../utils/formatters.dart';
 import '../widgets/expense_list_item.dart';
-import '../widgets/period_summary_card.dart';
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  static final _dateFormat = DateFormat('MMM d, yyyy');
+
+  // Dates currently selected in the pickers.
+  late DateTime _from;
+  late DateTime _to;
+
+  // Range the expense list is filtered by; updated when Apply is pressed.
+  late DateTime _appliedFrom;
+  late DateTime _appliedTo;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _to = DateTime(now.year, now.month, now.day);
+    _from = DateTime(_to.year, _to.month, _to.day - 30);
+    _appliedFrom = _from;
+    _appliedTo = _to;
+  }
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isFrom ? _from : _to,
+      firstDate: isFrom ? DateTime(2000) : _from,
+      lastDate: isFrom ? _to : DateTime(today.year, today.month, today.day),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _from = picked;
+      } else {
+        _to = picked;
+      }
+    });
+  }
+
+  void _applyFilter() {
+    setState(() {
+      _appliedFrom = _from;
+      _appliedTo = _to;
+    });
+  }
+
+  /// Every expense created between the start of [_appliedFrom] and the end
+  /// of [_appliedTo] (inclusive), newest first.
+  List<Expense> _filteredExpenses(ExpenseProvider provider) {
+    final start = _appliedFrom;
+    final end = DateTime(
+      _appliedTo.year,
+      _appliedTo.month,
+      _appliedTo.day + 1,
+    );
+    final expenses = [
+      for (final period in provider.allPeriods)
+        for (final expense in period.expenses)
+          if (!expense.createdAt.isBefore(start) &&
+              expense.createdAt.isBefore(end))
+            expense,
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return expenses;
+  }
 
   Future<void> _showClearHistoryDialog(
     BuildContext context,
@@ -80,8 +150,9 @@ class HistoryPage extends StatelessWidget {
           );
         }
 
-        final current = provider.currentPeriod;
         final previous = provider.previousPeriods;
+        final expenses = _filteredExpenses(provider);
+        final total = expenses.fold<double>(0, (sum, e) => sum + e.amount);
 
         return Scaffold(
           appBar: AppBar(
@@ -101,48 +172,89 @@ class HistoryPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
+                  children: [
+                    Expanded(
+                      child: _DateField(
+                        label: 'From',
+                        value: _dateFormat.format(_from),
+                        onTap: () => _pickDate(isFrom: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DateField(
+                        label: 'To',
+                        value: _dateFormat.format(_to),
+                        onTap: () => _pickDate(isFrom: false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: FilledButton(
+                  onPressed: _applyFilter,
+                  child: const Text('Apply'),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Current',
+                      '${_dateFormat.format(_appliedFrom)} - '
+                      '${_dateFormat.format(_appliedTo)}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     Text(
-                      formatBdt(current?.total ?? 0),
+                      formatBdt(total),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
                 ),
               ),
-              if (current == null || current.expenses.isEmpty)
+              if (expenses.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('No expenses yet'),
+                  child: Text('No expenses in this date range'),
                 )
               else
-                for (final expense in current.expenses)
+                for (final expense in expenses)
                   ExpenseListItem(expense: expense),
-              const Divider(height: 32),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  'Previous',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              if (previous.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('No previous expenses yet'),
-                )
-              else
-                for (final period in previous)
-                  PeriodSummaryCard(period: period),
               const SizedBox(height: 16),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          suffixIcon: const Icon(Icons.calendar_today, size: 18),
+        ),
+        child: Text(value),
+      ),
     );
   }
 }
