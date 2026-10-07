@@ -57,6 +57,25 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _close() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Close Period'),
+        content: const Text('Close the current period and start a new one?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Close Period'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
     await context.read<ExpenseProvider>().closeCurrent();
   }
 
