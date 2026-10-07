@@ -29,7 +29,11 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
     final now = DateTime.now();
     _to = DateTime(now.year, now.month, now.day);
-    _from = DateTime(_to.year, _to.month, _to.day - 30);
+    // Default to the current period's start date, falling back to today
+    // if the periods haven't loaded yet.
+    final startedAt =
+        context.read<ExpenseProvider>().currentPeriod?.startedAt ?? _to;
+    _from = DateTime(startedAt.year, startedAt.month, startedAt.day);
     _appliedFrom = _from;
     _appliedTo = _to;
   }
