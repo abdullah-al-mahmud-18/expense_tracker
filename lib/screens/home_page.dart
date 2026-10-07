@@ -8,7 +8,9 @@ import 'package:provider/provider.dart';
 import '../providers/expense_provider.dart';
 import '../services/csv_service.dart';
 import '../utils/formatters.dart';
+import '../utils/lowercase_text_formatter.dart';
 import '../widgets/expense_list_item.dart';
+import 'expense_types_page.dart';
 import 'history_page.dart';
 import 'stats_page.dart';
 
@@ -23,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -47,9 +51,8 @@ class _HomePageState extends State<HomePage> {
       _controller.clear();
     } on FormatException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -71,14 +74,12 @@ class _HomePageState extends State<HomePage> {
         'content': csvContent,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Exported to Downloads')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Exported to Downloads')));
     } on PlatformException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: ${e.message}')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Export failed: ${e.message}')));
     }
   }
 
@@ -119,19 +120,16 @@ class _HomePageState extends State<HomePage> {
     try {
       await provider.importCsv(utf8.decode(bytes));
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Import complete')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Import complete')));
     } on FormatException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Import failed: $e')));
     }
   }
 
@@ -145,27 +143,31 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.bar_chart),
             tooltip: 'Stats',
             onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const StatsPage()));
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const StatsPage()));
             },
           ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'History',
             onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const HistoryPage()));
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const HistoryPage()));
             },
           ),
           PopupMenuButton<String>(
             tooltip: 'More',
             onSelected: (value) {
+              if (value == 'types') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ExpenseTypesPage()),
+                );
+              }
               if (value == 'export') _exportCsv();
               if (value == 'import') _importCsv();
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'types', child: Text('Expense Types')),
               PopupMenuItem(value: 'export', child: Text('Export CSV')),
               PopupMenuItem(value: 'import', child: Text('Import CSV')),
             ],
@@ -205,14 +207,35 @@ class _HomePageState extends State<HomePage> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          inputFormatters: [_LowerCaseTextFormatter()],
-                          decoration: const InputDecoration(
-                            hintText: 'e.g. fare 60',
-                            border: OutlineInputBorder(),
+                        child: RawAutocomplete<String>(
+                          textEditingController: _controller,
+                          focusNode: _focusNode,
+                          optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                          optionsBuilder: (value) => _typeSuggestions(
+                            value.text,
+                            provider.expenseTypes.map((t) => t.name),
                           ),
-                          onSubmitted: (_) => _submit(),
+                          // Leave a trailing space so the amount can be typed
+                          // straight after picking a type.
+                          displayStringForOption: (type) => '$type ',
+                          fieldViewBuilder:
+                              (context, controller, focusNode, _) => TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                inputFormatters: const [
+                                  LowerCaseTextFormatter(),
+                                ],
+                                decoration: const InputDecoration(
+                                  hintText: 'e.g. fare 60',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onSubmitted: (_) => _submit(),
+                              ),
+                          optionsViewBuilder: (context, onSelected, options) =>
+                              _TypeSuggestionsView(
+                                options: options,
+                                onSelected: onSelected,
+                              ),
                         ),
                       ),
                       IconButton(
@@ -237,13 +260,43 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-/// Converts any typed or pasted uppercase letters to lowercase.
-class _LowerCaseTextFormatter extends TextInputFormatter {
+/// Saved expense types starting with [input], shown while the user is still
+/// typing the type (i.e. before the first space).
+Iterable<String> _typeSuggestions(String input, Iterable<String> types) {
+  final query = input.trimLeft();
+  if (query.isEmpty || query.contains(' ')) return const [];
+  return types.where((type) => type.startsWith(query) && type != query);
+}
+
+class _TypeSuggestionsView extends StatelessWidget {
+  final Iterable<String> options;
+  final AutocompleteOnSelected<String> onSelected;
+
+  const _TypeSuggestionsView({required this.options, required this.onSelected});
+
   @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return newValue.copyWith(text: newValue.text.toLowerCase());
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomLeft,
+      child: Material(
+        elevation: 4,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 280),
+          child: ListView(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            reverse: true,
+            children: [
+              for (final option in options)
+                ListTile(
+                  dense: true,
+                  title: Text(option),
+                  onTap: () => onSelected(option),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

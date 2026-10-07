@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE periods (
@@ -37,11 +37,32 @@ class DatabaseHelper {
             created_at INTEGER NOT NULL
           )
         ''');
+        await _createExpenseTypesTable(db);
         await db.insert('periods', {
           'started_at': DateTime.now().millisecondsSinceEpoch,
           'closed_at': null,
         });
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createExpenseTypesTable(db);
+          // Seed suggestions from types already used in expenses.
+          await db.execute('''
+            INSERT OR IGNORE INTO expense_types (name)
+            SELECT DISTINCT lower(type) FROM expenses
+            WHERE lower(type) NOT GLOB '*[^a-z]*'
+          ''');
+        }
+      },
     );
+  }
+
+  Future<void> _createExpenseTypesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE expense_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE
+      )
+    ''');
   }
 }

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../models/expense.dart';
 import '../providers/expense_provider.dart';
 import '../utils/formatters.dart';
-import '../widgets/expense_list_item.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -61,21 +60,17 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   /// Every expense created between the start of [_appliedFrom] and the end
-  /// of [_appliedTo] (inclusive), newest first.
+  /// of [_appliedTo] (inclusive).
   List<Expense> _filteredExpenses(ExpenseProvider provider) {
     final start = _appliedFrom;
-    final end = DateTime(
-      _appliedTo.year,
-      _appliedTo.month,
-      _appliedTo.day + 1,
-    );
+    final end = DateTime(_appliedTo.year, _appliedTo.month, _appliedTo.day + 1);
     final expenses = [
       for (final period in provider.allPeriods)
         for (final expense in period.expenses)
           if (!expense.createdAt.isBefore(start) &&
               expense.createdAt.isBefore(end))
             expense,
-    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    ];
     return expenses;
   }
 
@@ -153,6 +148,15 @@ class _HistoryPageState extends State<HistoryPage> {
         final previous = provider.previousPeriods;
         final expenses = _filteredExpenses(provider);
         final total = expenses.fold<double>(0, (sum, e) => sum + e.amount);
+        final typeTotals = <String, double>{};
+        for (final expense in expenses) {
+          typeTotals.update(
+            expense.type,
+            (sum) => sum + expense.amount,
+            ifAbsent: () => expense.amount,
+          );
+        }
+        final sortedTypes = typeTotals.keys.toList()..sort();
 
         return Scaffold(
           appBar: AppBar(
@@ -200,19 +204,10 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${_dateFormat.format(_appliedFrom)} - '
-                      '${_dateFormat.format(_appliedTo)}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      formatBdt(total),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
+                child: Text(
+                  '${_dateFormat.format(_appliedFrom)} - '
+                  '${_dateFormat.format(_appliedTo)}',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               if (expenses.isEmpty)
@@ -220,9 +215,28 @@ class _HistoryPageState extends State<HistoryPage> {
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Text('No expenses in this date range'),
                 )
-              else
-                for (final expense in expenses)
-                  ExpenseListItem(expense: expense),
+              else ...[
+                for (final type in sortedTypes)
+                  ListTile(
+                    dense: true,
+                    title: Text(type),
+                    trailing: Text(
+                      formatBdt(typeTotals[type]!),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                const Divider(),
+                ListTile(
+                  title: Text(
+                    'Total',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  trailing: Text(
+                    formatBdt(total),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
             ],
           ),

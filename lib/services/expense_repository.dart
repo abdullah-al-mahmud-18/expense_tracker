@@ -1,5 +1,8 @@
+import 'package:sqflite/sqflite.dart';
+
 import '../models/expense.dart';
 import '../models/expense_period.dart';
+import '../models/expense_type.dart';
 import '../models/imported_row.dart';
 import 'database_helper.dart';
 
@@ -117,9 +120,7 @@ class ExpenseRepository {
       );
     }
 
-    final openCount = periodMeta.values
-        .where((p) => p.closedAt == null)
-        .length;
+    final openCount = periodMeta.values.where((p) => p.closedAt == null).length;
     if (openCount != 1) {
       throw const FormatException(
         'CSV must contain exactly one open (current) period',
@@ -155,5 +156,49 @@ class ExpenseRepository {
         });
       }
     });
+  }
+
+  Future<List<ExpenseType>> getExpenseTypes() async {
+    final db = await _dbHelper.database;
+    final rows = await db.query('expense_types', orderBy: 'name ASC');
+    return rows.map(ExpenseType.fromMap).toList();
+  }
+
+  /// Throws a [FormatException] if an expense type named [name] already
+  /// exists.
+  Future<void> addExpenseType(String name) async {
+    final db = await _dbHelper.database;
+    try {
+      await db.insert('expense_types', {'name': name});
+    } on DatabaseException catch (e) {
+      if (e.isUniqueConstraintError()) {
+        throw FormatException('"$name" already exists');
+      }
+      rethrow;
+    }
+  }
+
+  /// Throws a [FormatException] if another expense type named [name]
+  /// already exists.
+  Future<void> renameExpenseType(int id, String name) async {
+    final db = await _dbHelper.database;
+    try {
+      await db.update(
+        'expense_types',
+        {'name': name},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } on DatabaseException catch (e) {
+      if (e.isUniqueConstraintError()) {
+        throw FormatException('"$name" already exists');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteExpenseType(int id) async {
+    final db = await _dbHelper.database;
+    await db.delete('expense_types', where: 'id = ?', whereArgs: [id]);
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:expense_tracker/models/expense_period.dart';
+import 'package:expense_tracker/models/expense_type.dart';
 import 'package:expense_tracker/models/imported_row.dart';
 import 'package:expense_tracker/providers/expense_provider.dart';
 import 'package:expense_tracker/screens/home_page.dart';
@@ -30,6 +31,21 @@ class FakeExpenseRepository implements ExpenseRepository {
 
   @override
   Future<void> replaceAllData(List<ImportedExpenseRow> rows) async {}
+
+  @override
+  Future<List<ExpenseType>> getExpenseTypes() async => const [
+    ExpenseType(id: 1, name: 'fare'),
+    ExpenseType(id: 2, name: 'grocery'),
+  ];
+
+  @override
+  Future<void> addExpenseType(String name) async {}
+
+  @override
+  Future<void> renameExpenseType(int id, String name) async {}
+
+  @override
+  Future<void> deleteExpenseType(int id) async {}
 }
 
 void main() {
@@ -38,8 +54,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) =>
-            ExpenseProvider(repository: FakeExpenseRepository()),
+        create: (_) => ExpenseProvider(repository: FakeExpenseRepository()),
         child: const MaterialApp(home: HomePage()),
       ),
     );
@@ -52,5 +67,27 @@ void main() {
       find.widgetWithText(OutlinedButton, 'close'),
     );
     expect(closeButton.onPressed, isNull);
+  });
+
+  testWidgets('Typing shows matching expense type suggestions', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => ExpenseProvider(repository: FakeExpenseRepository()),
+        child: const MaterialApp(home: HomePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'g');
+    await tester.pumpAndSettle();
+    expect(find.text('grocery'), findsOneWidget);
+    expect(find.text('fare'), findsNothing);
+
+    await tester.tap(find.text('grocery'));
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'grocery ');
   });
 }
