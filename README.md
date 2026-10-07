@@ -45,8 +45,8 @@ Available from the ⋮ menu on the Home page (**Expense Types**).
 ### History page
 
 - Filter expenses by date range with the **From** and **To** date
-  pickers, then tap **Apply**. Defaults to the last 30 days (today minus
-  30 days through today); both end dates are included.
+  pickers, then tap **Apply**. **From** defaults to the date the current
+  period started and **To** to today; both end dates are included.
 - Shows the total spent on each expense type in the selected range
   (sorted by type name), across current and previous periods, followed
   by the overall total for the range.
